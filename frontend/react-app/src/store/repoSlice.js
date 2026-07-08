@@ -1,0 +1,69 @@
+import { createSlice } from '@reduxjs/toolkit';
+
+const initialState = {
+  repos: [],
+  activeRepoId: null,
+  ingestionProgress: {}, // key: repoId, value: { step, message, current, total }
+  loading: false,
+  error: null,
+};
+
+const repoSlice = createSlice({
+  name: 'repo',
+  initialState,
+  reducers: {
+    setRepos: (state, action) => {
+      state.repos = action.payload;
+    },
+    addRepo: (state, action) => {
+      // Add only if not already present
+      if (!state.repos.some(r => r._id === action.payload._id)) {
+        state.repos.unshift(action.payload);
+      }
+    },
+    setActiveRepoId: (state, action) => {
+      state.activeRepoId = action.payload;
+    },
+    updateIngestionProgress: (state, action) => {
+      const { repoId, step, message, current, total } = action.payload;
+      state.ingestionProgress[repoId] = { step, message, current, total };
+      
+      // Update repo status in list if it changes
+      const repo = state.repos.find(r => r._id === repoId);
+      if (repo) {
+        if (step === 'completed') {
+          repo.ingestionStatus = 'completed';
+        } else if (step === 'failed') {
+          repo.ingestionStatus = 'failed';
+        } else if (step === 'started' || step === 'fetching_commits' || step === 'fetching_prs' || step === 'ingesting_commits' || step === 'ingesting_prs') {
+          repo.ingestionStatus = 'ingesting';
+        }
+      }
+    },
+    setLoading: (state, action) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action) => {
+      state.error = action.payload;
+    },
+    deleteRepoInState: (state, action) => {
+      state.repos = state.repos.filter(r => r._id !== action.payload);
+      if (state.activeRepoId === action.payload) {
+        state.activeRepoId = null;
+      }
+      delete state.ingestionProgress[action.payload];
+    }
+  },
+});
+
+export const {
+  setRepos,
+  addRepo,
+  setActiveRepoId,
+  updateIngestionProgress,
+  setLoading,
+  setError,
+  deleteRepoInState
+} = repoSlice.actions;
+
+export default repoSlice.reducer;
