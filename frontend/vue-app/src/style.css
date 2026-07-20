@@ -2,29 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #0f172a;
-  color: #f8fafc;
-  overflow-x: hidden;
+@layer base {
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    background-color: #12100E; /* Soil background */
+    color: #EDE6D6; /* Parchment/bone text */
+    overflow-x: hidden;
+  }
 }
 
-/* Custom scrollbars */
+/* Premium styled custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #12100E;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 3px;
+  background: #1D1A16;
+  border: 1px solid rgba(201, 162, 39, 0.15);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #C9A227;
+}
+
+/* Custom outline focus ring for keyboard accessibility */
+*:focus-visible {
+  outline: 2px solid #C9A227;
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar utility for sediment history box */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(201, 162, 39, 0.2);
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 162, 39, 0.4);
 }

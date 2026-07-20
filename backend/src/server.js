@@ -12,6 +12,7 @@ const PullRequest = require('./models/PullRequest');
 const ChatSession = require('./models/ChatSession');
 const DecisionRecord = require('./models/DecisionRecord');
 const { startIngestion } = require('./services/ingestion');
+const github = require('./services/github');
 
 const app = express();
 const server = http.createServer(app);
@@ -66,32 +67,108 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Chronicle Backend API is running' });
 });
 
+// GitHub PAT token validation and user repository loading
+app.post('/api/github/validate-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token is required' });
+    const user = await github.validateToken(token);
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/github/repos', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token is required' });
+    const userRepos = await github.fetchUserRepos(token);
+    res.json(userRepos);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Real GitHub OAuth connected app redirection endpoints
+app.get('/api/github/oauth/login', (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const defaultCallback = `${req.protocol}://${req.get('host')}/auth/github/callback`;
+  const redirectUri = process.env.REDIRECT_URI || defaultCallback;
+  const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  res.redirect(authorizeUrl);
+});
+
+app.get('/auth/github/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  try {
+    const { code, error, error_description } = req.query;
+
+    // Handle user cancellation or missing authorization code
+    if (error || !code) {
+      const errorMsg = error_description || 'GitHub authorization was cancelled.';
+      return res.redirect(`${frontendUrl}?error=${encodeURIComponent(errorMsg)}`);
+    }
+
+    // Exchange the authorization code for access token
+    const tokenExchangeResponse = await axios.post(
+      'https://github.com/login/oauth/access_token',
+      {
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+      },
+      {
+        headers: { Accept: 'application/json' },
+      }
+    );
+
+    const token = tokenExchangeResponse.data.access_token;
+    if (!token) {
+      return res.redirect(`${frontendUrl}?error=${encodeURIComponent('Failed to exchange code for access token.')}`);
+    }
+
+    // Redirect user back to the React client with token in search parameters
+    res.redirect(`${frontendUrl}?token=${token}`);
+  } catch (error) {
+    console.error('Error exchanging GitHub OAuth code:', error.message);
+    res.redirect(`${frontendUrl}?error=${encodeURIComponent(error.message)}`);
+  }
+});
+
 // 1. REPO ROUTES
 
-// List all repositories
+// List all repositories for a user (or all if username not provided)
 app.get('/api/repos', async (req, res) => {
   try {
-    const repos = await Repo.find().sort({ createdAt: -1 });
+    const { username } = req.query;
+    const query = username ? { githubUsername: username } : {};
+    const repos = await Repo.find(query).sort({ createdAt: -1 });
     res.json(repos);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Connect and trigger Ingestion of a repo
+// Connect and trigger Ingestion of a repo scoped to a user
 app.post('/api/repos/connect', async (req, res) => {
   try {
-    const { repoUrl } = req.body;
+    const { repoUrl, githubToken, githubUsername } = req.body;
     if (!repoUrl) {
       return res.status(400).json({ error: 'repoUrl is required' });
     }
 
     const { owner, name } = parseRepoUrl(repoUrl);
+    const userScope = githubUsername || '';
     
-    // Check if repo already exists
-    let repo = await Repo.findOne({ owner, name });
+    // Check if repo already exists for this user scope
+    let repo = await Repo.findOne({ owner, name, githubUsername: userScope });
     
     if (repo) {
+      // Update token if new one is supplied
+      if (githubToken) {
+        repo.githubToken = githubToken;
+      }
       // If ingestion failed or was completed, we can trigger it again
       if (repo.ingestionStatus === 'completed' || repo.ingestionStatus === 'failed') {
         repo.ingestionStatus = 'pending';
@@ -100,12 +177,20 @@ app.post('/api/repos/connect', async (req, res) => {
         
         // Trigger background ingestion asynchronously
         startIngestion(repo._id, io);
+      } else {
+        await repo.save();
       }
       return res.json(repo);
     }
 
     // Create new repo
-    repo = new Repo({ owner, name, ingestionStatus: 'pending' });
+    repo = new Repo({ 
+      owner, 
+      name, 
+      ingestionStatus: 'pending',
+      githubToken: githubToken || '',
+      githubUsername: userScope
+    });
     await repo.save();
 
     // Trigger background ingestion asynchronously
@@ -271,6 +356,13 @@ app.post('/api/chat/session/:sessionId/message', async (req, res) => {
     let responseText = '';
     let citations = [];
 
+    // Emit synthesizing trace
+    io.to(session.repoId.toString()).emit('agent_trace', {
+      repoId: session.repoId.toString(),
+      step: 'synthesizing',
+      message: 'Synthesizing response from PR reviews and commit history...',
+    });
+
     try {
       console.log(`Sending query to python agent at ${agentServiceUrl}/api/agent/chat...`);
       const agentRes = await axios.post(`${agentServiceUrl}/api/agent/chat`, {
@@ -278,13 +370,18 @@ app.post('/api/chat/session/:sessionId/message', async (req, res) => {
         session_id: session._id.toString(),
         message: content,
       });
-      
+
       responseText = agentRes.data.response;
       citations = agentRes.data.citations || [];
     } catch (agentError) {
       console.error('Failed to communicate with python agent service:', agentError.message);
       responseText = "I'm sorry, I'm having trouble connecting to my decision analysis agent service right now. Please make sure the agent service is running.";
       citations = [];
+      io.to(session.repoId.toString()).emit('agent_trace', {
+        repoId: session.repoId.toString(),
+        step: 'failed',
+        message: 'Synthesis failed: ' + agentError.message,
+      });
     }
 
     // 3. Add assistant response with citations
@@ -295,6 +392,13 @@ app.post('/api/chat/session/:sessionId/message', async (req, res) => {
     });
     await session.save();
 
+    // Emit completed trace
+    io.to(session.repoId.toString()).emit('agent_trace', {
+      repoId: session.repoId.toString(),
+      step: 'completed',
+      message: 'Answer synthesized.',
+    });
+
     res.json(session);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -303,15 +407,22 @@ app.post('/api/chat/session/:sessionId/message', async (req, res) => {
 
 // Trigger decision extraction for a file or function manually
 app.post('/api/repos/:id/extract-decision', async (req, res) => {
+  const repoId = req.params.id;
   try {
-    const repoId = req.params.id;
     const { filePath, functionName } = req.body;
     if (!filePath) {
       return res.status(400).json({ error: 'filePath is required' });
     }
 
+    // Emit extracting trace
+    io.to(repoId).emit('agent_trace', {
+      repoId,
+      step: 'extracting',
+      message: `Retrieving commit details and PR discussions for file: ${filePath}...`,
+    });
+
     const agentServiceUrl = process.env.AGENT_SERVICE_URL;
-    
+
     // Call agent service
     const agentRes = await axios.post(`${agentServiceUrl}/api/agent/extract`, {
       repo_id: repoId,
@@ -321,7 +432,14 @@ app.post('/api/repos/:id/extract-decision', async (req, res) => {
 
     const result = agentRes.data;
     const decisionsData = result.decisions || [result];
-    
+
+    // Emit verifying trace
+    io.to(repoId).emit('agent_trace', {
+      repoId,
+      step: 'verifying',
+      message: `Verifying extracted decisions against latest code state...`,
+    });
+
     const savedDecisions = [];
     for (const item of decisionsData) {
       const decision = await DecisionRecord.findOneAndUpdate(
@@ -343,9 +461,21 @@ app.post('/api/repos/:id/extract-decision', async (req, res) => {
       );
       savedDecisions.push(decision);
     }
-    
+
+    // Emit completed trace
+    io.to(repoId).emit('agent_trace', {
+      repoId,
+      step: 'completed',
+      message: `Extraction complete. Extracted ${savedDecisions.length} decisions.`,
+    });
+
     res.json(savedDecisions[0] || {});
   } catch (error) {
+    io.to(repoId).emit('agent_trace', {
+      repoId,
+      step: 'failed',
+      message: `Extraction failed: ${error.message}`,
+    });
     res.status(500).json({ error: error.message });
   }
 });

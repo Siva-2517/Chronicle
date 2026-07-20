@@ -38,25 +38,25 @@ async function startIngestion(repoId, io) {
     emitProgress('started', { message: 'Initializing connection to GitHub...' });
 
     // 1. Fetch Repository Details to verify access
-    const details = await github.getRepoDetails(repo.owner, repo.name);
+    const details = await github.getRepoDetails(repo.owner, repo.name, repo.githubToken);
     console.log(`Found repo: ${details.owner}/${details.name}`);
 
     // 2. Fetch Commits
     emitProgress('fetching_commits', { message: 'Fetching commit history from GitHub...' });
-    const commitsList = await github.fetchCommits(repo.owner, repo.name, 50);
+    const commitsList = await github.fetchCommits(repo.owner, repo.name, 50, repo.githubToken);
     console.log(`Fetched ${commitsList.length} commits for ${repo.owner}/${repo.name}`);
 
-    emitProgress('ingesting_commits', { 
+    emitProgress('ingesting_commits', {
       message: 'Analyzing commits and downloading code patches...',
       current: 0,
-      total: commitsList.length 
+      total: commitsList.length
     });
 
     const detailedCommits = [];
     // Fetch details for each commit. We fetch in series/small batches to prevent hitting secondary rate limits.
     for (let i = 0; i < commitsList.length; i++) {
       const commitMeta = commitsList[i];
-      
+
       // Update progress every few commits
       emitProgress('ingesting_commits', {
         message: `Downloading patch for commit ${commitMeta.sha.substring(0, 7)}...`,
@@ -64,15 +64,15 @@ async function startIngestion(repoId, io) {
         total: commitsList.length
       });
 
-      const details = await github.fetchCommitDetails(repo.owner, repo.name, commitMeta.sha);
-      
+      const details = await github.fetchCommitDetails(repo.owner, repo.name, commitMeta.sha, repo.githubToken);
+
       // Save or update in MongoDB
       await Commit.findOneAndUpdate(
         { repoId, sha: details.sha },
         { ...details, repoId },
         { upsert: true, new: true }
       );
-      
+
       detailedCommits.push(details);
       // Tiny delay to respect Github API rate limits
       await delay(100);
@@ -80,13 +80,13 @@ async function startIngestion(repoId, io) {
 
     // 3. Fetch PRs
     emitProgress('fetching_prs', { message: 'Fetching pull requests and developer discussions...' });
-    const prsList = await github.fetchPullRequests(repo.owner, repo.name, 30);
+    const prsList = await github.fetchPullRequests(repo.owner, repo.name, 30, repo.githubToken);
     console.log(`Fetched ${prsList.length} pull requests`);
 
-    emitProgress('ingesting_prs', { 
+    emitProgress('ingesting_prs', {
       message: 'Extracting reviews, inline comments, and issue links...',
       current: 0,
-      total: prsList.length 
+      total: prsList.length
     });
 
     for (let i = 0; i < prsList.length; i++) {
@@ -98,7 +98,7 @@ async function startIngestion(repoId, io) {
         total: prsList.length
       });
 
-      const details = await github.fetchPRCommentsAndReviews(repo.owner, repo.name, prMeta.number);
+      const details = await github.fetchPRCommentsAndReviews(repo.owner, repo.name, prMeta.number, repo.githubToken);
 
       const prData = {
         repoId,
@@ -133,19 +133,19 @@ async function startIngestion(repoId, io) {
     await repo.save();
 
     console.log(`Successfully completed ingestion for ${repo.owner}/${repo.name}`);
-    emitProgress('completed', { 
-      message: `Ingestion completed! Loaded ${commitsList.length} commits and ${prsList.length} PRs.` 
+    emitProgress('completed', {
+      message: `Ingestion completed! Loaded ${commitsList.length} commits and ${prsList.length} PRs.`
     });
 
   } catch (error) {
     console.error(`Ingestion failed for repo ${repoId}:`, error);
-    
+
     if (repo) {
       repo.ingestionStatus = 'failed';
       repo.errorMessage = error.message;
       await repo.save();
     }
-    
+
     emitProgress('failed', { message: `Ingestion failed: ${error.message}` });
   }
 }

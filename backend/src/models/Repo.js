@@ -24,6 +24,15 @@ const RepoSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  githubToken: {
+    type: String,
+    default: '',
+  },
+  githubUsername: {
+    type: String,
+    default: '',
+    index: true,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -34,8 +43,8 @@ const RepoSchema = new mongoose.Schema({
   },
 });
 
-// Composite unique index to avoid duplicate repos
-RepoSchema.index({ owner: 1, name: 1 }, { unique: true });
+// Composite unique index to avoid duplicate repos per user
+RepoSchema.index({ owner: 1, name: 1, githubUsername: 1 }, { unique: true });
 
 RepoSchema.pre('save', function (next) {
   this.updatedAt = Date.now();

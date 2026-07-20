@@ -21,6 +21,12 @@ def clean_and_parse_json(content: str) -> Any:
         parts = content.split("```")
         if len(parts) >= 3:
             content = parts[1].strip()
+    else:
+        # Find first '{' and last '}' to strip any surrounding conversational text
+        start_idx = content.find('{')
+        end_idx = content.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            content = content[start_idx:end_idx+1].strip()
     return json.loads(content)
 
 from database import get_commits_for_file, get_prs_for_commits, get_collection, get_all_commits, get_all_prs

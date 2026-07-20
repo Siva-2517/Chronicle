@@ -16,7 +16,6 @@ const repoSlice = createSlice({
       state.repos = action.payload;
     },
     addRepo: (state, action) => {
-      // Add only if not already present
       if (!state.repos.some(r => r._id === action.payload._id)) {
         state.repos.unshift(action.payload);
       }
@@ -26,16 +25,15 @@ const repoSlice = createSlice({
     },
     updateIngestionProgress: (state, action) => {
       const { repoId, step, message, current, total } = action.payload;
-      state.ingestionProgress[repoId] = { step, message, current, total };
+      state.ingestionProgress[repoId] = { repoId, step, message, current, total };
       
-      // Update repo status in list if it changes
       const repo = state.repos.find(r => r._id === repoId);
       if (repo) {
         if (step === 'completed') {
           repo.ingestionStatus = 'completed';
         } else if (step === 'failed') {
           repo.ingestionStatus = 'failed';
-        } else if (step === 'started' || step === 'fetching_commits' || step === 'fetching_prs' || step === 'ingesting_commits' || step === 'ingesting_prs') {
+        } else if (step === 'started' || step.startsWith('fetching_') || step.startsWith('ingesting_')) {
           repo.ingestionStatus = 'ingesting';
         }
       }

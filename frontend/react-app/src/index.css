@@ -2,29 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #0f172a;
-  color: #f8fafc;
-  overflow-x: hidden;
+@layer base {
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    background-color: #12100E; /* Soil background */
+    color: #EDE6D6; /* Parchment/bone text */
+    overflow-x: hidden;
+  }
 }
 
-/* Custom scrollbars for a premium dark mode feel */
+/* Premium styled custom scrollbars for the dig-site archaeology dashboard */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #12100E; /* Soil background */
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
+  background: #1D1A16; /* Surface cards */
+  border: 1px solid rgba(201, 162, 39, 0.15); /* Ochre border */
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #C9A227; /* Ochre */
+}
+
+/* Dynamic scanning laser animation */
+@keyframes scan-animation {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+.animate-scan {
+  animation: scan-animation 3s infinite linear;
+}
+
+/* Custom outline focus ring for keyboard accessibility */
+*:focus-visible {
+  outline: 2px solid #C9A227;
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar utility for sediment history box */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(201, 162, 39, 0.2);
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 162, 39, 0.4);
 }
