@@ -31,10 +31,10 @@
 
 | Service / App | Platform | URL / Endpoint |
 | :--- | :--- | :--- |
-| **React App (Workspace Coordinator)** | Vercel / Netlify | `http://localhost:3000` |
-| **Vue App (Decision Visualizer)** | Vercel / Netlify | `http://localhost:3001` |
-| **Node.js Express Backend** | Railway / Render | `http://localhost:5000` |
-| **Python LangGraph Agent** | Railway / Cloud Run | `http://localhost:8000` |
+| **React App (Workspace Coordinator)** | Vercel | `http://localhost:3000` |
+| **Vue App (Decision Visualizer)** | Vercel | `http://localhost:3001` |
+| **Node.js Express Backend** | Render | `http://localhost:5000` |
+| **Python LangGraph Agent** | Render | `http://localhost:8000` |
 
 ---
 
