@@ -29,11 +29,25 @@ class ChatRequest(BaseModel):
     session_id: str = Field(..., description="MongoDB ChatSession ID")
     message: str = Field(..., description="User question")
 
+class IndexRequest(BaseModel):
+    repo_id: str = Field(..., description="MongoDB repo ID to index in vector store")
+
 # --- ENDPOINTS ---
 
 @app.get("/")
 def read_root():
     return {"status": "ok", "service": "Chronicle Agent Service"}
+
+@app.post("/api/agent/index")
+async def index_repository(payload: IndexRequest):
+    try:
+        from chroma_service import index_repository_artifacts
+        print(f"Triggering vector indexing for repo {payload.repo_id}...")
+        result = await index_repository_artifacts(payload.repo_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}")
+
 
 @app.post("/api/agent/extract")
 async def extract_decisions(payload: DecisionRequest):
@@ -84,6 +98,7 @@ async def chat_with_agent(payload: ChatRequest):
             "commits": [],
             "pull_requests": [],
             "decisions": [],
+            "vector_matches": [],
             "answer": "",
             "citations": [],
             "errors": []

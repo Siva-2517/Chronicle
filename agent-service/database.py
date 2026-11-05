@@ -4,6 +4,7 @@ from bson import ObjectId
 from dotenv import load_dotenv
 
 load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 MONGO_URI = os.getenv("MONGO_URI")
 if not MONGO_URI:

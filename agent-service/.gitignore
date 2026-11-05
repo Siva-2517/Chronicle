@@ -6,3 +6,6 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 chroma_db/
+chroma_data/
+chroma_eval_data/
+test_chroma/

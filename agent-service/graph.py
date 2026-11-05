@@ -29,8 +29,11 @@ def clean_and_parse_json(content: str) -> Any:
             content = content[start_idx:end_idx+1].strip()
     return json.loads(content)
 
+import re
 from database import get_commits_for_file, get_prs_for_commits, get_collection, get_all_commits, get_all_prs
 from llm import get_llm
+from chroma_service import query_vector_artifacts
+
 
 # ==========================================
 # 1. DECISION-EXTRACTION PIPELINE
@@ -305,23 +308,47 @@ class ChatState(TypedDict):
     commits: List[Dict[str, Any]]
     pull_requests: List[Dict[str, Any]]
     decisions: List[Dict[str, Any]]
+    vector_matches: List[Dict[str, Any]]
     answer: str
     citations: List[Dict[str, Any]]
     errors: List[str]
 
 async def retrieve_chat_context_node(state: ChatState) -> ChatState:
     """
-    Node 1: Searches database for commits, PRs, and decisions matching user's query keywords
+    Node 1: Hybrid Retrieval Engine
+    Combines:
+    1. Structured file-path lookups (if specific files are mentioned in query)
+    2. Exact & regex token matching in MongoDB (commit messages, PR titles/bodies)
+    3. Semantic vector search across ChromaDB (diff patches, PR descriptions, review comments)
     """
     repo_id = state["repo_id"]
-    query = state["message"]
+    query = state["message"].strip()
     
+    commits_col = get_collection("commits")
+    prs_col = get_collection("pullrequests")
+    decisions_col = get_collection("decisionrecords")
+
+    matched_commits_map = {}
+    matched_prs_map = {}
+    matched_decisions = []
+    vector_matches = []
+
     try:
-        # Simple text search / regex matches in MongoDB for MVP
-        commits_col = get_collection("commits")
-        prs_col = get_collection("pullrequests")
-        decisions_col = get_collection("decisionrecords")
-        
+        # 1. STRUCTURED FILE-PATH LOOKUP
+        # Detect any explicit filenames/paths mentioned in the user query (e.g. server.js, /src/models/Repo.js)
+        file_candidates = re.findall(r'[\w\-./\\]+\.[a-zA-Z0-9]+', query)
+        for fc in file_candidates:
+            # Strip leading slashes/dots for search
+            clean_fc = fc.strip("./\\ ")
+            if len(clean_fc) >= 3:
+                file_commits = await commits_col.find({
+                    "repoId": ObjectId(repo_id),
+                    "files.filename": {"$regex": re.escape(clean_fc), "$options": "i"}
+                }).to_list(length=10)
+                for fc_commit in file_commits:
+                    matched_commits_map[fc_commit["sha"]] = fc_commit
+
+        # 2. MONGODB REGEX SEARCH
         # Search commits
         commit_cursor = commits_col.find({
             "repoId": ObjectId(repo_id),
@@ -330,7 +357,9 @@ async def retrieve_chat_context_node(state: ChatState) -> ChatState:
                 {"files.filename": {"$regex": query, "$options": "i"}}
             ]
         })
-        commits = await commit_cursor.to_list(length=10)
+        regex_commits = await commit_cursor.to_list(length=10)
+        for rc in regex_commits:
+            matched_commits_map[rc["sha"]] = rc
         
         # Search PRs
         pr_cursor = prs_col.find({
@@ -341,28 +370,78 @@ async def retrieve_chat_context_node(state: ChatState) -> ChatState:
                 {"comments.body": {"$regex": query, "$options": "i"}}
             ]
         })
-        prs = await pr_cursor.to_list(length=10)
+        regex_prs = await pr_cursor.to_list(length=10)
+        for rp in regex_prs:
+            matched_prs_map[rp["number"]] = rp
         
         # Search decisions
         dec_cursor = decisions_col.find({
             "repoId": ObjectId(repo_id),
             "summary": {"$regex": query, "$options": "i"}
         })
-        decisions = await dec_cursor.to_list(length=10)
-        
-        # If we got nothing, fallback to fetching recent commits/PRs
+        matched_decisions = await dec_cursor.to_list(length=10)
+
+        # 3. CHROMADB VECTOR SEARCH (Semantic Retrieval)
+        try:
+            vector_items = query_vector_artifacts(repo_id=repo_id, query=query, n_results=10)
+            vector_matches = vector_items
+
+            vector_shas_to_fetch = []
+            vector_prs_to_fetch = []
+
+            for item in vector_items:
+                meta = item.get("metadata", {})
+                m_type = meta.get("type", "")
+                
+                if m_type == "commit" and meta.get("sha"):
+                    sha = meta["sha"]
+                    if sha not in matched_commits_map:
+                        vector_shas_to_fetch.append(sha)
+                elif m_type in ("pr_body", "review_comment") and meta.get("pr_number") and meta["pr_number"] != -1:
+                    pr_num = int(meta["pr_number"])
+                    if pr_num not in matched_prs_map:
+                        vector_prs_to_fetch.append(pr_num)
+
+            # Hydrate missing commits from MongoDB
+            if vector_shas_to_fetch:
+                hydrated_commits = await commits_col.find({
+                    "repoId": ObjectId(repo_id),
+                    "sha": {"$in": vector_shas_to_fetch}
+                }).to_list(length=10)
+                for hc in hydrated_commits:
+                    matched_commits_map[hc["sha"]] = hc
+
+            # Hydrate missing PRs from MongoDB
+            if vector_prs_to_fetch:
+                hydrated_prs = await prs_col.find({
+                    "repoId": ObjectId(repo_id),
+                    "number": {"$in": vector_prs_to_fetch}
+                }).to_list(length=10)
+                for hp in hydrated_prs:
+                    matched_prs_map[hp["number"]] = hp
+
+        except Exception as vec_err:
+            print(f"Chroma vector search step skipped: {vec_err}")
+
+        # 4. FALLBACK: If nothing was matched by regex, file path, or vector, fetch latest history
+        commits = list(matched_commits_map.values())
+        prs = list(matched_prs_map.values())
+
         if not commits and not prs:
             commits = await get_all_commits(repo_id)
             prs = await get_all_prs(repo_id)
-            
+
         state["commits"] = commits[:15]
         state["pull_requests"] = prs[:15]
-        state["decisions"] = decisions
+        state["decisions"] = matched_decisions
+        state["vector_matches"] = vector_matches
+        
     except Exception as e:
         state["errors"] = state.get("errors", []) + [f"Context search failed: {str(e)}"]
         state["commits"] = []
         state["pull_requests"] = []
         state["decisions"] = []
+        state["vector_matches"] = []
         
     return state
 
@@ -374,6 +453,7 @@ async def synthesize_answer_node(state: ChatState) -> ChatState:
     commits = state.get("commits", [])
     prs = state.get("pull_requests", [])
     decisions = state.get("decisions", [])
+    vector_matches = state.get("vector_matches", [])
     
     # Construct context
     context = ""
@@ -398,6 +478,8 @@ async def synthesize_answer_node(state: ChatState) -> ChatState:
             context += "Files changed:\n"
             for f in c.get("files", [])[:3]: # limit list
                 context += f"  - {f.get('filename', 'unknown')} ({f.get('status', 'unknown')})\n"
+                if f.get("patch"):
+                    context += f"    Diff patch snippet: {f['patch'][:400]}\n"
             context += "\n"
             
     if prs:
@@ -410,6 +492,14 @@ async def synthesize_answer_node(state: ChatState) -> ChatState:
                 for comm in pr.get("comments", [])[:3]: # limit list
                     context += f"  - {comm.get('author', 'unknown')}: {comm.get('body', '')}\n"
             context += "\n"
+
+    # Add any vector-matched review comments with code diff snippets
+    review_matches = [vm for vm in vector_matches if vm.get("metadata", {}).get("type") == "review_comment"]
+    if review_matches:
+        context += "--- Semantically Matched PR Review Comments & Inline Discussions ---\n"
+        for rm in review_matches[:5]:
+            context += f"- {rm.get('document', '')}\n\n"
+
 
     try:
         llm = get_llm(temperature=0.2)

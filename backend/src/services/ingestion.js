@@ -2,6 +2,7 @@ const Repo = require('../models/Repo');
 const Commit = require('../models/Commit');
 const PullRequest = require('../models/PullRequest');
 const github = require('./github');
+const axios = require('axios');
 
 // Simple helper to sleep/delay (used to respect GitHub rate limits if needed)
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -125,7 +126,18 @@ async function startIngestion(repoId, io) {
       await delay(100);
     }
 
-    // 4. Wrap up Ingestion
+    // 4. Trigger Vector Re-indexing
+    emitProgress('indexing_vectors', { message: 'Indexing code diffs, PRs, and review comments into vector store...' });
+    try {
+      const agentServiceUrl = process.env.AGENT_SERVICE_URL || 'http://localhost:8000';
+      console.log(`Triggering vector re-index at ${agentServiceUrl}/api/agent/index for repo ${repoId}...`);
+      await axios.post(`${agentServiceUrl}/api/agent/index`, { repo_id: repoId.toString() }, { timeout: 120000 });
+      console.log(`Vector re-indexing completed for repo ${repoId}`);
+    } catch (indexErr) {
+      console.warn(`Vector re-indexing warning for repo ${repoId}:`, indexErr.message);
+    }
+
+    // 5. Wrap up Ingestion
     const latestCommitSha = commitsList.length > 0 ? commitsList[0].sha : '';
     repo.ingestionStatus = 'completed';
     repo.lastIngestedCommitSha = latestCommitSha;
@@ -134,8 +146,9 @@ async function startIngestion(repoId, io) {
 
     console.log(`Successfully completed ingestion for ${repo.owner}/${repo.name}`);
     emitProgress('completed', {
-      message: `Ingestion completed! Loaded ${commitsList.length} commits and ${prsList.length} PRs.`
+      message: `Ingestion completed! Loaded ${commitsList.length} commits and ${prsList.length} PRs into Mongo & vector store.`
     });
+
 
   } catch (error) {
     console.error(`Ingestion failed for repo ${repoId}:`, error);

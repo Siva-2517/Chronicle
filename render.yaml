@@ -36,3 +36,11 @@ services:
         sync: false          # Set in Render Dashboard
       - key: GEMINI_API_KEY_SECONDARY
         sync: false          # Set in Render Dashboard
+      - key: PINECONE_API_KEY
+        sync: false          # Set in Render Dashboard (from app.pinecone.io)
+      - key: PINECONE_INDEX_NAME
+        value: chronicle
+      - key: PINECONE_CLOUD
+        value: aws
+      - key: PINECONE_REGION
+        value: us-east-1
