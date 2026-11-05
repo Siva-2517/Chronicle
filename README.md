@@ -29,12 +29,12 @@
 
 ## 🌐 Live Deployments & Environment URLs
 
-| Service / App | Platform | URL / Endpoint |
-| :--- | :--- | :--- |
-| **React App (Workspace Coordinator)** | Vercel | `http://localhost:3000` |
-| **Vue App (Decision Visualizer)** | Vercel | `http://localhost:3001` |
-| **Node.js Express Backend** | Render | `http://localhost:5000` |
-| **Python LangGraph Agent** | Render | `http://localhost:8000` |
+| Service / App | Platform | Production URL | Local Endpoint |
+| :--- | :--- | :--- | :--- |
+| **React App (Workspace Coordinator)** | Vercel | [`https://chronicle-r4pj.vercel.app/`](https://chronicle-r4pj.vercel.app/) | `http://localhost:3000` |
+| **Vue App (Decision Visualizer)** | Vercel | [`https://chronicle-rose-delta.vercel.app/`](https://chronicle-rose-delta.vercel.app/) | `http://localhost:3001` |
+| **Node.js Express Backend** | Render | [`https://chronicle-backend-service.onrender.com`](https://chronicle-backend-service.onrender.com) | `http://localhost:5000` |
+| **Python LangGraph Agent** | Render | [`https://chronicle-agent-service.onrender.com`](https://chronicle-agent-service.onrender.com) | `http://localhost:8000` |
 
 ---
 
@@ -57,8 +57,9 @@ Chronicle reconstructs the engineering context behind any target file or functio
 ## 🔥 Key Technical Highlights & Innovations
 
 * 🧠 **Autonomous Multi-Agent Pipeline (LangGraph + Gemini 1.5 Flash)**: Implements an asynchronous 4-node state graph (Data Retrieval, Decision Extraction, Staleness Verification, and Citation Synthesis) to analyze git blame and PR review threads without hallucination.
+* 🔍 **Hybrid Vector Retrieval (Pinecone Serverless / ChromaDB + Gemini Embeddings)**: Combines structured file-path lookups, MongoDB token matching, and semantic vector similarity search over commit diffs, PR bodies, and review comments. Supports production-grade Pinecone Serverless and local ChromaDB persistence.
 * 🛡️ **Real GitHub OAuth & Multi-Tenant Scoping**: Supports full GitHub OAuth 2.0 app authorization and Personal Access Token (PAT) fallbacks. Repositories, decisions, and chat threads are isolated per user (`githubUsername`) in MongoDB.
-* ⚡ **Real-Time WebSocket Tracing**: Uses Socket.io to stream granular agent execution steps (`retrieving`, `extracting`, `verifying`, `synthesizing`) live to the frontend interface.
+* ⚡ **Real-Time WebSocket Tracing**: Uses Socket.io to stream granular agent execution steps (`retrieving`, `extracting`, `verifying`, `synthesizing`, `indexing_vectors`) live to the frontend interface.
 * 🎨 **Polyglot Design System ("Stratigraphy Palette")**: Combines React 18 + Redux Toolkit for workspace coordination with a custom Vue 3 timeline visualizer, styled with IBM Plex typography and warm soil/ochre glassmorphism.
 * 🔐 **Automated Security Safeguards**: Features an automated 1-hour session security auto-logout timer and grace error handling for OAuth cancellations.
 
@@ -89,7 +90,8 @@ flowchart TD
 
     subgraph Storage ["Cloud Services & Database"]
         MongoDB[("MongoDB Atlas Database")]
-        GeminiAPI["Google Gemini 2.5 Flash API"]
+        VectorStore[("Pinecone / ChromaDB Vector Store")]
+        GeminiAPI["Google Gemini 1.5 Flash API"]
         GitHubAPI["GitHub REST API"]
     end
 
@@ -99,6 +101,7 @@ flowchart TD
     LangGraph --> RetrievalNode --> ExtractionNode --> StalenessNode --> SynthesisNode
     ExtractionNode & SynthesisNode <--> GeminiAPI
     ExpressServer & LangGraph <--> MongoDB
+    LangGraph <--> VectorStore
 ```
 
 ---
@@ -110,10 +113,12 @@ flowchart TD
 | **Frontend Coordinator** | React 18, Redux Toolkit, Vite | Manages workspace state, GitHub OAuth sessions, and real-time live tracing indicators. |
 | **Timeline Visualizer** | Vue 3, Lucide Icons | Renders chronological sediment layers, staleness badges, and side detail drawers. |
 | **Styling & UI Tokens** | Tailwind CSS v3 | Curated "Stratigraphy" palette (soil `#1D1A16`, ochre `#E5A853`, teal `#3AAFA9`, rust `#D9534F`). |
-| **Backend API** | Node.js, Express, Socket.io | Manages user scoping, OAuth code-for-token exchange, and dynamic Octokit client instances. |
+| **Backend API** | Node.js, Express, Socket.io | Manages user scoping, OAuth code-for-token exchange, dynamic Octokit client instances, and vector indexing triggers. |
 | **Agent Microservice** | Python 3.10+, FastAPI | Runs async LangGraph workflows with Pydantic payload validation. |
+| **Vector Retrieval** | Pinecone Serverless / ChromaDB + Gemini Embeddings | Hybrid search combining structured file lookups, regex, and semantic embeddings (`models/gemini-embedding-001`). |
 | **LLM Reasoning** | LangChain + Gemini 1.5 Flash | Structured JSON parsing, zero-shot decision extraction, and semantic grounding. |
 | **Database** | MongoDB Atlas, Mongoose, Motor | Indexed composite keys (`owner`, `name`, `githubUsername`) for multi-tenant isolation. |
+
 
 ---
 
@@ -153,7 +158,7 @@ Chronicle/
 ### 1. Clone & Configure Environment Variables
 
 ```bash
-git clone https://github.com/your-username/Chronicle.git
+git clone https://github.com/Siva-2517/Chronicle.git
 cd Chronicle
 ```
 
@@ -169,10 +174,24 @@ AGENT_SERVICE_URL=http://localhost:8000
 
 #### Python Agent Configuration (`agent-service/.env`):
 ```env
+PORT=8000
 MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/chronicle
 GEMINI_API_KEY=your_primary_gemini_api_key
-PORT=8000
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
+
+# Vector Database: Pinecone Serverless (Production) or ChromaDB (Local fallback)
+PINECONE_API_KEY=your_pinecone_api_key
+PINECONE_INDEX_NAME=chronicle
+PINECONE_CLOUD=aws
+PINECONE_REGION=us-east-1
+
+# Chroma Local fallback (Used automatically if PINECONE_API_KEY is omitted)
+CHROMA_API_KEY=
+CHROMA_TENANT=
+CHROMA_DATABASE=default_database
 ```
+
 
 ---
 
@@ -231,7 +250,11 @@ cd frontend/vue-app && npm run build
 
 # Node Syntax Verification
 cd backend && node --check src/server.js src/models/Repo.js src/services/github.js src/services/ingestion.js
+
+# Retrieval Accuracy Benchmark (Regex vs. Hybrid Chroma Vector)
+cd agent-service && .\venv\Scripts\python evaluate_retrieval.py
 ```
+
 
 ---
 

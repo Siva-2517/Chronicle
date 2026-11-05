@@ -352,7 +352,7 @@ app.post('/api/chat/session/:sessionId/message', async (req, res) => {
     await session.save();
 
     // 2. Query Agent Python FastAPI Service
-    const agentServiceUrl = process.env.AGENT_SERVICE_URL;
+    const agentServiceUrl = process.env.AGENT_SERVICE_URL || 'http://localhost:8000';
     let responseText = '';
     let citations = [];
 
@@ -421,7 +421,7 @@ app.post('/api/repos/:id/extract-decision', async (req, res) => {
       message: `Retrieving commit details and PR discussions for file: ${filePath}...`,
     });
 
-    const agentServiceUrl = process.env.AGENT_SERVICE_URL;
+    const agentServiceUrl = process.env.AGENT_SERVICE_URL || 'http://localhost:8000';
 
     // Call agent service
     const agentRes = await axios.post(`${agentServiceUrl}/api/agent/extract`, {

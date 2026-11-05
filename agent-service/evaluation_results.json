@@ -1,0 +1,211 @@
+{
+  "timestamp": "2026-10-25T09:41:59.491733+00:00",
+  "total_questions": 20,
+  "metrics": {
+    "regex_only_hit_rate": 95.0,
+    "hybrid_hit_rate": 100.0,
+    "gain_percentage": 5.0
+  },
+  "questions": [
+    {
+      "id": "Q01",
+      "category": "Exact Token",
+      "query": "How is GitHub OAuth authorization code exchange handled?",
+      "target": "commit:c01_oauth_flow",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c01_oauth_flow",
+      "hybrid_top_match": "commit:c01_oauth_flow"
+    },
+    {
+      "id": "Q02",
+      "category": "Exact Token",
+      "query": "Where do we emit agent_trace steps through Socket.io?",
+      "target": "commit:c03_socket_tracing",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c03_socket_tracing",
+      "hybrid_top_match": "commit:c03_socket_tracing"
+    },
+    {
+      "id": "Q03",
+      "category": "Exact Token",
+      "query": "What file uses AsyncIOMotorClient for database connections?",
+      "target": "commit:c06_motor_async",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c06_motor_async",
+      "hybrid_top_match": "commit:c06_motor_async"
+    },
+    {
+      "id": "Q04",
+      "category": "Exact Token",
+      "query": "Where is the repoSlice Redux Toolkit store defined?",
+      "target": "pr:101",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:101",
+      "hybrid_top_match": "pr:101"
+    },
+    {
+      "id": "Q05",
+      "category": "Structured File / Token",
+      "query": "What is the structure of the DecisionRecord schema in backend/src/models/DecisionRecord.js?",
+      "target": "pr:110",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:110",
+      "hybrid_top_match": "pr:110"
+    },
+    {
+      "id": "Q06",
+      "category": "Semantic / Synonym",
+      "query": "Why do we pause between fetching commits during repository crawl?",
+      "target": "commit:c02_rate_limiter",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c02_rate_limiter",
+      "hybrid_top_match": "commit:c02_rate_limiter"
+    },
+    {
+      "id": "Q07",
+      "category": "Semantic / Synonym",
+      "query": "How do we prevent hitting GitHub rate limits during ingestion?",
+      "target": "commit:c02_rate_limiter",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c02_rate_limiter",
+      "hybrid_top_match": "commit:c02_rate_limiter"
+    },
+    {
+      "id": "Q08",
+      "category": "Semantic / Synonym",
+      "query": "How does the system detect if old architectural assumptions have become outdated or invalidated?",
+      "target": "commit:c04_staleness_check",
+      "regex_hit": false,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:103",
+      "hybrid_top_match": "pr:103"
+    },
+    {
+      "id": "Q09",
+      "category": "Semantic / Synonym",
+      "query": "Why did we choose earthy, soil, and ochre colors for the visual design?",
+      "target": "commit:c05_soil_palette",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c05_soil_palette",
+      "hybrid_top_match": "commit:c05_soil_palette"
+    },
+    {
+      "id": "Q10",
+      "category": "Semantic / Synonym",
+      "query": "How does Chronicle handle messy JSON strings or triple backtick fences returned by the language model?",
+      "target": "commit:c07_json_cleaner",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c07_json_cleaner",
+      "hybrid_top_match": "commit:c07_json_cleaner"
+    },
+    {
+      "id": "Q11",
+      "category": "Semantic / Synonym",
+      "query": "What accessibility measures were implemented for users sensitive to sliding animations?",
+      "target": "commit:c08_reduced_motion",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c08_reduced_motion",
+      "hybrid_top_match": "commit:c08_reduced_motion"
+    },
+    {
+      "id": "Q12",
+      "category": "Semantic / Synonym",
+      "query": "What security mechanism protects tokens if a developer leaves their browser unattended?",
+      "target": "commit:c09_session_timeout",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c05_soil_palette",
+      "hybrid_top_match": "commit:c09_session_timeout"
+    },
+    {
+      "id": "Q13",
+      "category": "Semantic / Synonym",
+      "query": "How can a user authenticate without creating a full GitHub Developer OAuth application?",
+      "target": "commit:c10_pat_fallback",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "commit:c10_pat_fallback",
+      "hybrid_top_match": "commit:c10_pat_fallback"
+    },
+    {
+      "id": "Q14",
+      "category": "Semantic / Synonym",
+      "query": "How does the Vue timeline know which repository data to display when opened from the React client?",
+      "target": "pr:102",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:102",
+      "hybrid_top_match": "pr:102"
+    },
+    {
+      "id": "Q15",
+      "category": "Semantic / Code Context",
+      "query": "Why is the LLM temperature set to zero during decision extraction?",
+      "target": "pr:103",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:103",
+      "hybrid_top_match": "pr:103"
+    },
+    {
+      "id": "Q16",
+      "category": "Semantic / UI Behavior",
+      "query": "How do chat citation buttons navigate the user to the matching chronological layer?",
+      "target": "pr:104",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:104",
+      "hybrid_top_match": "pr:104"
+    },
+    {
+      "id": "Q17",
+      "category": "Semantic / Multi-Tenant",
+      "query": "How are repositories separated so team members don't overwrite each other's data?",
+      "target": "pr:105",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:105",
+      "hybrid_top_match": "pr:105"
+    },
+    {
+      "id": "Q18",
+      "category": "Semantic / Infrastructure",
+      "query": "How are the Express API and Python microservices deployed together in the cloud?",
+      "target": "pr:106",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:106",
+      "hybrid_top_match": "pr:106"
+    },
+    {
+      "id": "Q19",
+      "category": "Semantic / Architecture",
+      "query": "Why are full git line-by-line diffs cached in the database instead of being re-fetched from GitHub on demand?",
+      "target": "pr:107",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:107",
+      "hybrid_top_match": "pr:107"
+    },
+    {
+      "id": "Q20",
+      "category": "Semantic / Resilience",
+      "query": "What failover prevents downtime when Google AI quota limits are reached?",
+      "target": "pr:108",
+      "regex_hit": true,
+      "hybrid_hit": true,
+      "regex_top_match": "pr:108",
+      "hybrid_top_match": "pr:108"
+    }
+  ]
+}
