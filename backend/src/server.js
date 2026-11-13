@@ -15,6 +15,7 @@ const { startIngestion } = require('./services/ingestion');
 const github = require('./services/github');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Configure CORS to allow access from local React and Vue dev servers
@@ -93,6 +94,11 @@ app.post('/api/github/repos', async (req, res) => {
 // Real GitHub OAuth connected app redirection endpoints
 app.get('/api/github/oauth/login', (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId) {
+    return res.status(500).json({
+      error: 'GITHUB_CLIENT_ID environment variable is missing in backend configuration.'
+    });
+  }
   const defaultCallback = `${req.protocol}://${req.get('host')}/auth/github/callback`;
   const redirectUri = process.env.REDIRECT_URI || defaultCallback;
   const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&redirect_uri=${encodeURIComponent(redirectUri)}`;
@@ -125,7 +131,8 @@ app.get('/auth/github/callback', async (req, res) => {
 
     const token = tokenExchangeResponse.data.access_token;
     if (!token) {
-      return res.redirect(`${frontendUrl}?error=${encodeURIComponent('Failed to exchange code for access token.')}`);
+      const errorMsg = tokenExchangeResponse.data.error_description || tokenExchangeResponse.data.error || 'Failed to exchange code for access token.';
+      return res.redirect(`${frontendUrl}?error=${encodeURIComponent(errorMsg)}`);
     }
 
     // Redirect user back to the React client with token in search parameters

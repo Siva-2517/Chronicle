@@ -18,6 +18,14 @@ services:
         sync: false          # Set in Render Dashboard
       - key: AGENT_SERVICE_URL
         sync: false          # Set AFTER agent-service is deployed (its .onrender.com URL)
+      - key: GITHUB_CLIENT_ID
+        sync: false          # Set in Render Dashboard from GitHub OAuth App
+      - key: GITHUB_CLIENT_SECRET
+        sync: false          # Set in Render Dashboard from GitHub OAuth App
+      - key: FRONTEND_URL
+        value: https://chronicle-r4pj.vercel.app
+      - key: REDIRECT_URI
+        value: https://chronicle-backend-service.onrender.com/auth/github/callback
 
   # ──────────────────────────────────────────────
   # 2. Python FastAPI Agent Service (LangGraph AI)
